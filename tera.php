@@ -1,6 +1,7 @@
 <?php
 $url = "https://github.com/Arctixinc/Aeonn";
 $repo = "Arctixinc/Aeonn";
+$githubApiKey = "your_github_api_key"; // Replace with your GitHub API key
 $telegramBotToken = "5526166086:AAFR0aUzqJt4KYXJ7BPDIsu4e8NuQ1J-Jec";
 $chatId = "1881720028";
 $messageSent = false;
@@ -10,11 +11,11 @@ $lastBranches = [];
 
 date_default_timezone_set('Asia/Kolkata');
 
-function getRepoStatus($url) {
+function getRepoStatus($url, $apiKey) {
     $options = array(
         'http' => array(
             'method' => 'GET',
-            'header' => "User-Agent: PHP\r\n"
+            'header' => "User-Agent: PHP\r\nAuthorization: token $apiKey\r\n"
         )
     );
     $context = stream_context_create($options);
@@ -82,12 +83,12 @@ function sendTelegramDocument($token, $chatId, $documentPath, $caption = "") {
     return $result !== false ? $result : "Error sending document.";
 }
 
-function downloadBranches($repo) {
+function downloadBranches($repo, $apiKey) {
     $branchesUrl = "https://api.github.com/repos/$repo/branches";
     $options = array(
         'http' => array(
             'method' => 'GET',
-            'header' => "User-Agent: PHP\r\n"
+            'header' => "User-Agent: PHP\r\nAuthorization: token $apiKey\r\n"
         )
     );
     $context = stream_context_create($options);
@@ -118,12 +119,12 @@ function downloadBranches($repo) {
     return $downloadedFiles;
 }
 
-function getBranchFileList($repo, $branch) {
+function getBranchFileList($repo, $branch, $apiKey) {
     $branchUrl = "https://api.github.com/repos/$repo/branches/$branch";
     $options = array(
         'http' => array(
             'method' => 'GET',
-            'header' => "User-Agent: PHP\r\n"
+            'header' => "User-Agent: PHP\r\nAuthorization: token $apiKey\r\n"
         )
     );
     $context = stream_context_create($options);
@@ -162,10 +163,10 @@ function getBranchFileList($repo, $branch) {
     return $files;
 }
 
-function checkForChanges($repo, $branch) {
+function checkForChanges($repo, $branch, $apiKey) {
     global $lastBranchFiles;
 
-    $currentFiles = getBranchFileList($repo, $branch);
+    $currentFiles = getBranchFileList($repo, $branch, $apiKey);
     if (!is_array($currentFiles)) {
         return $currentFiles; // Error message
     }
@@ -190,7 +191,7 @@ function checkForChanges($repo, $branch) {
 }
 
 while (true) {
-    $status = getRepoStatus($url);
+    $status = getRepoStatus($url, $githubApiKey);
     echo "Repository status: $status\n";
 
     if ($status == "Private") {
@@ -206,7 +207,7 @@ while (true) {
             $response = sendTelegramMessage($telegramBotToken, $chatId, $message);
             echo "Telegram response: $response\n";
 
-            $downloadedFiles = downloadBranches($repo);
+            $downloadedFiles = downloadBranches($repo, $githubApiKey);
             if (!is_array($downloadedFiles)) {
                 echo $downloadedFiles; // Error message
             } else {
@@ -219,13 +220,13 @@ while (true) {
             }
 
             foreach (array_keys($downloadedFiles) as $branch) {
-                $lastBranchFiles[$branch] = getBranchFileList($repo, $branch);
+                $lastBranchFiles[$branch] = getBranchFileList($repo, $branch, $githubApiKey);
             }
 
             $lastBranches = array_keys($downloadedFiles);
             $messageSent = true;
         } else {
-            $downloadedFiles = downloadBranches($repo);
+            $downloadedFiles = downloadBranches($repo, $githubApiKey);
             if (is_array($downloadedFiles)) {
                 $currentBranches = array_keys($downloadedFiles);
                 $newBranches = array_diff($currentBranches, $lastBranches);
@@ -238,7 +239,7 @@ while (true) {
                 }
 
                 foreach ($currentBranches as $branch) {
-                    $changes = checkForChanges($repo, $branch);
+                    $changes = checkForChanges($repo, $branch, $githubApiKey);
                     if (!empty($changes)) {
                         foreach ($changes as $filePath => $change) {
                             $caption = "Change in Branch: $branch\nFile: $filePath\nChange: $change";
